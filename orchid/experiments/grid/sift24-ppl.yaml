@@ -1,0 +1,9 @@
+kind: test_ivf
+args:
+  nlist: 4096
+  prob_dims: 64
+  pred_zarr: ../data/sift1m_c24.zarr
+  vec_zarr: ../data/sift1m.zarr
+  csv: logs/sift24ppl_4096.csv
+  use_gpu: true
+  predict_pl: true

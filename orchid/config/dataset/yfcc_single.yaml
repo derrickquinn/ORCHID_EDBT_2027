@@ -1,0 +1,4 @@
+name: yfcc_single
+vec_zarr: ../data/yfcc10m_single.zarr
+pred_zarr: ../data/yfcc10m_single.zarr
+nlists: 12288

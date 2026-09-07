@@ -1,0 +1,9 @@
+kind: optimize_ivf
+args:
+  nlist: 4096
+  prob_dims: 64
+  sample_docs: 512
+  pred_zarr: ../data/laion_neg.zarr
+  vec_zarr: ../data/laion1m.zarr
+  csv: logs/spool_laion_neg4096.csv
+  use_gpu: false

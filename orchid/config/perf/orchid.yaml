@@ -1,0 +1,55 @@
+kind: perf
+args:
+  batch_size: null
+  warmup: 1
+  iterations: 100
+  min_iterations: 3
+  qps_relative_ci_half_width: 0.05
+  log_base: logs
+  exp_name: 0IVFH-PC
+  step_nprobe: 40
+  sample_docs: 512
+  sample_queries: 512
+  per_dataset:
+    laion_all:
+      alpha: 0.05232991496266739
+      beta: 0.0237137
+      high_nprobe: 768
+    laion_neg:
+      alpha: 0.8058424163569451
+      beta: 0.0237137
+      high_nprobe: 256
+    laion_pos:
+      alpha: 0.1910952642008692
+      beta: 0.0153993
+      high_nprobe: 512
+    sift12:
+      alpha: 0.45315891252407253
+      beta: 0.01
+      high_nprobe: 64
+    sift24:
+      alpha: 0.36517393116157676
+      beta: 0.01
+      high_nprobe: 48
+    sift48:
+      alpha: 0.45315891252407253
+      beta: 0.01
+      high_nprobe: 128
+    sift_r10:
+      alpha: 0.5623415332340304
+      beta: 0.01
+      high_nprobe: 48
+    sift_r20:
+      alpha: 0.45315891252407253
+      beta: 0.01
+      high_nprobe: 48
+    sift_r40:
+      alpha: 0.45315891252407253
+      beta: 0.0237137
+      high_nprobe: 128
+    yfcc:
+      alpha: 0.011547813645881198
+      beta: 0.000486968
+    yfcc_single:
+      alpha: 0.027384192520503503
+      beta: 0.000486968

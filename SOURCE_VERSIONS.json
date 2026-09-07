@@ -1,0 +1,463 @@
+{
+  "harness": {
+    "repository": "https://github.com/derrickquinn/hybrid_search",
+    "commit": "06b8cfd8fb48bfab21ab0b6d9037ff30047d5520",
+    "files": [
+      {
+        "source": "sigmod/baseline_adapters/CMakeLists.txt",
+        "path": "orchid/baseline_adapters/CMakeLists.txt"
+      },
+      {
+        "source": "sigmod/baseline_adapters/README.md",
+        "path": "orchid/baseline_adapters/README.md"
+      },
+      {
+        "source": "sigmod/baseline_adapters/build_adapters.py",
+        "path": "orchid/baseline_adapters/build_adapters.py"
+      },
+      {
+        "source": "sigmod/baseline_adapters/include/adapter_common.h",
+        "path": "orchid/baseline_adapters/include/adapter_common.h"
+      },
+      {
+        "source": "sigmod/baseline_adapters/real_data_smoke_test.py",
+        "path": "orchid/baseline_adapters/real_data_smoke_test.py"
+      },
+      {
+        "source": "sigmod/baseline_adapters/smoke_test.py",
+        "path": "orchid/baseline_adapters/smoke_test.py"
+      },
+      {
+        "source": "sigmod/baseline_adapters/src/acorn_adapter.cpp",
+        "path": "orchid/baseline_adapters/src/acorn_adapter.cpp"
+      },
+      {
+        "source": "sigmod/baseline_adapters/src/navix_adapter.cpp",
+        "path": "orchid/baseline_adapters/src/navix_adapter.cpp"
+      },
+      {
+        "source": "sigmod/baseline_adapters/src/navix_construction_benchmark.cpp",
+        "path": "orchid/baseline_adapters/src/navix_construction_benchmark.cpp"
+      },
+      {
+        "source": "sigmod/build_cagra.py",
+        "path": "orchid/build_cagra.py"
+      },
+      {
+        "source": "sigmod/cagra_adapter.py",
+        "path": "orchid/cagra_adapter.py"
+      },
+      {
+        "source": "sigmod/cagra_native/CMakeLists.txt",
+        "path": "orchid/cagra_native/CMakeLists.txt"
+      },
+      {
+        "source": "sigmod/cagra_native/smoke_test.py",
+        "path": "orchid/cagra_native/smoke_test.py"
+      },
+      {
+        "source": "sigmod/cagra_native/src/cagra_adapter.cu",
+        "path": "orchid/cagra_native/src/cagra_adapter.cu"
+      },
+      {
+        "source": "sigmod/config/dataset/laion_all.yaml",
+        "path": "orchid/config/dataset/laion_all.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/laion_neg.yaml",
+        "path": "orchid/config/dataset/laion_neg.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/laion_pos.yaml",
+        "path": "orchid/config/dataset/laion_pos.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/sift12.yaml",
+        "path": "orchid/config/dataset/sift12.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/sift24.yaml",
+        "path": "orchid/config/dataset/sift24.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/sift48.yaml",
+        "path": "orchid/config/dataset/sift48.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/sift_r10.yaml",
+        "path": "orchid/config/dataset/sift_r10.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/sift_r20.yaml",
+        "path": "orchid/config/dataset/sift_r20.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/sift_r40.yaml",
+        "path": "orchid/config/dataset/sift_r40.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/yfcc.yaml",
+        "path": "orchid/config/dataset/yfcc.yaml"
+      },
+      {
+        "source": "sigmod/config/dataset/yfcc_single.yaml",
+        "path": "orchid/config/dataset/yfcc_single.yaml"
+      },
+      {
+        "source": "sigmod/config/perf/acorn.yaml",
+        "path": "orchid/config/perf/acorn.yaml"
+      },
+      {
+        "source": "sigmod/config/perf/cagra.yaml",
+        "path": "orchid/config/perf/cagra.yaml"
+      },
+      {
+        "source": "sigmod/config/perf/ivf.yaml",
+        "path": "orchid/config/perf/ivf.yaml"
+      },
+      {
+        "source": "sigmod/config/perf/navix.yaml",
+        "path": "orchid/config/perf/navix.yaml"
+      },
+      {
+        "source": "sigmod/config/perf/orchid-p.yaml",
+        "path": "orchid/config/perf/orchid-p.yaml"
+      },
+      {
+        "source": "sigmod/config/perf/orchid.yaml",
+        "path": "orchid/config/perf/orchid.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/laion_all.yaml",
+        "path": "orchid/experiments/grid/laion_all.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/laion_neg-ppl.yaml",
+        "path": "orchid/experiments/grid/laion_neg-ppl.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/laion_neg.yaml",
+        "path": "orchid/experiments/grid/laion_neg.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/laion_pos-ppl.yaml",
+        "path": "orchid/experiments/grid/laion_pos-ppl.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/laion_pos.yaml",
+        "path": "orchid/experiments/grid/laion_pos.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift12-ppl.yaml",
+        "path": "orchid/experiments/grid/sift12-ppl.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift12.yaml",
+        "path": "orchid/experiments/grid/sift12.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift24-ppl.yaml",
+        "path": "orchid/experiments/grid/sift24-ppl.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift24.yaml",
+        "path": "orchid/experiments/grid/sift24.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift48-ppl.yaml",
+        "path": "orchid/experiments/grid/sift48-ppl.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift48.yaml",
+        "path": "orchid/experiments/grid/sift48.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift_r10.yaml",
+        "path": "orchid/experiments/grid/sift_r10.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift_r20.yaml",
+        "path": "orchid/experiments/grid/sift_r20.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/sift_r40.yaml",
+        "path": "orchid/experiments/grid/sift_r40.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/yfcc-ppl.yaml",
+        "path": "orchid/experiments/grid/yfcc-ppl.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/yfcc.yaml",
+        "path": "orchid/experiments/grid/yfcc.yaml"
+      },
+      {
+        "source": "sigmod/experiments/grid/yfcc_single.yaml",
+        "path": "orchid/experiments/grid/yfcc_single.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/laion_all.yaml",
+        "path": "orchid/experiments/orchid-p/laion_all.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/laion_neg.yaml",
+        "path": "orchid/experiments/orchid-p/laion_neg.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/laion_pos.yaml",
+        "path": "orchid/experiments/orchid-p/laion_pos.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/sift12.yaml",
+        "path": "orchid/experiments/orchid-p/sift12.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/sift24.yaml",
+        "path": "orchid/experiments/orchid-p/sift24.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/sift48.yaml",
+        "path": "orchid/experiments/orchid-p/sift48.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/sift_r10.yaml",
+        "path": "orchid/experiments/orchid-p/sift_r10.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/sift_r20.yaml",
+        "path": "orchid/experiments/orchid-p/sift_r20.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/sift_r40.yaml",
+        "path": "orchid/experiments/orchid-p/sift_r40.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/yfcc.yaml",
+        "path": "orchid/experiments/orchid-p/yfcc.yaml"
+      },
+      {
+        "source": "sigmod/experiments/orchid-p/yfcc_single.yaml",
+        "path": "orchid/experiments/orchid-p/yfcc_single.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/laion_all.yaml",
+        "path": "orchid/experiments/spool/laion_all.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/laion_neg.yaml",
+        "path": "orchid/experiments/spool/laion_neg.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/laion_pos.yaml",
+        "path": "orchid/experiments/spool/laion_pos.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/sift12.yaml",
+        "path": "orchid/experiments/spool/sift12.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/sift24.yaml",
+        "path": "orchid/experiments/spool/sift24.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/sift48.yaml",
+        "path": "orchid/experiments/spool/sift48.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/sift_r10.yaml",
+        "path": "orchid/experiments/spool/sift_r10.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/sift_r20.yaml",
+        "path": "orchid/experiments/spool/sift_r20.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/sift_r40.yaml",
+        "path": "orchid/experiments/spool/sift_r40.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/yfcc.yaml",
+        "path": "orchid/experiments/spool/yfcc.yaml"
+      },
+      {
+        "source": "sigmod/experiments/spool/yfcc_single.yaml",
+        "path": "orchid/experiments/spool/yfcc_single.yaml"
+      },
+      {
+        "source": "sigmod/ivf_utils.py",
+        "path": "orchid/ivf_utils.py"
+      },
+      {
+        "source": "sigmod/kmeans.py",
+        "path": "orchid/kmeans.py"
+      },
+      {
+        "source": "sigmod/optimize_orchid.py",
+        "path": "orchid/optimize_orchid.py"
+      },
+      {
+        "source": "sigmod/perf.py",
+        "path": "orchid/perf.py"
+      },
+      {
+        "source": "sigmod/perf_acorn.py",
+        "path": "orchid/perf_acorn.py"
+      },
+      {
+        "source": "sigmod/perf_baseline.py",
+        "path": "orchid/perf_baseline.py"
+      },
+      {
+        "source": "sigmod/perf_cagra.py",
+        "path": "orchid/perf_cagra.py"
+      },
+      {
+        "source": "sigmod/perf_navix.py",
+        "path": "orchid/perf_navix.py"
+      },
+      {
+        "source": "sigmod/perf_results.py",
+        "path": "orchid/perf_results.py"
+      },
+      {
+        "source": "sigmod/predicate_index.py",
+        "path": "orchid/predicate_index.py"
+      },
+      {
+        "source": "sigmod/predicate_workload.py",
+        "path": "orchid/predicate_workload.py"
+      },
+      {
+        "source": "sigmod/src/baseline_perf_config.py",
+        "path": "orchid/src/baseline_perf_config.py"
+      },
+      {
+        "source": "sigmod/src/build_ivf_config.py",
+        "path": "orchid/src/build_ivf_config.py"
+      },
+      {
+        "source": "sigmod/src/construct_ivf.py",
+        "path": "orchid/src/construct_ivf.py"
+      },
+      {
+        "source": "sigmod/src/dataset_config.py",
+        "path": "orchid/src/dataset_config.py"
+      },
+      {
+        "source": "sigmod/src/optimize_ivf.py",
+        "path": "orchid/src/optimize_ivf.py"
+      },
+      {
+        "source": "sigmod/src/rank_selectivity.py",
+        "path": "orchid/src/rank_selectivity.py"
+      },
+      {
+        "source": "sigmod/src/test_ivf.py",
+        "path": "orchid/src/test_ivf.py"
+      },
+      {
+        "source": "sigmod/test_orchid.py",
+        "path": "orchid/test_orchid.py"
+      },
+      {
+        "source": "sigmod/tests/test_baseline_perf_config.py",
+        "path": "orchid/tests/test_baseline_perf_config.py"
+      },
+      {
+        "source": "sigmod/tests/test_cluster_major.py",
+        "path": "orchid/tests/test_cluster_major.py"
+      },
+      {
+        "source": "sigmod/tests/test_optimize_orchid.py",
+        "path": "orchid/tests/test_optimize_orchid.py"
+      },
+      {
+        "source": "sigmod/tests/test_perf_baseline.py",
+        "path": "orchid/tests/test_perf_baseline.py"
+      },
+      {
+        "source": "sigmod/tests/test_perf_config.py",
+        "path": "orchid/tests/test_perf_config.py"
+      },
+      {
+        "source": "sigmod/tests/test_perf_results.py",
+        "path": "orchid/tests/test_perf_results.py"
+      },
+      {
+        "source": "sigmod/tests/test_predicate_bitmap.py",
+        "path": "orchid/tests/test_predicate_bitmap.py"
+      },
+      {
+        "source": "sigmod/tests/test_predicate_index.py",
+        "path": "orchid/tests/test_predicate_index.py"
+      },
+      {
+        "source": "sigmod/tests/test_predicate_workload.py",
+        "path": "orchid/tests/test_predicate_workload.py"
+      },
+      {
+        "source": "sigmod/tests/test_test_orchid.py",
+        "path": "orchid/tests/test_test_orchid.py"
+      },
+      {
+        "source": "sigmod/tests/test_topk_small.py",
+        "path": "orchid/tests/test_topk_small.py"
+      },
+      {
+        "source": "sigmod/utils.py",
+        "path": "orchid/utils.py"
+      },
+      {
+        "source": "sigmod/utils_cpp/__init__.py",
+        "path": "orchid/utils_cpp/__init__.py"
+      },
+      {
+        "source": "sigmod/utils_cpp/pyproject.toml",
+        "path": "orchid/utils_cpp/pyproject.toml"
+      },
+      {
+        "source": "sigmod/utils_cpp/setup.py",
+        "path": "orchid/utils_cpp/setup.py"
+      },
+      {
+        "source": "sigmod/utils_cpp/src/cluster_legals_kernels.h",
+        "path": "orchid/utils_cpp/src/cluster_legals_kernels.h"
+      },
+      {
+        "source": "sigmod/utils_cpp/src/cluster_legals_pybind.cpp",
+        "path": "orchid/utils_cpp/src/cluster_legals_pybind.cpp"
+      },
+      {
+        "source": "sigmod/utils_cpp/src/predicate_eval_kernels.h",
+        "path": "orchid/utils_cpp/src/predicate_eval_kernels.h"
+      },
+      {
+        "source": "sigmod/utils_cpp/src/topk_kernels.h",
+        "path": "orchid/utils_cpp/src/topk_kernels.h"
+      },
+      {
+        "source": "sigmod/utils_cpp/tests/test_ids_to_bitmap.py",
+        "path": "orchid/utils_cpp/tests/test_ids_to_bitmap.py"
+      },
+      {
+        "source": "sigmod/utils_cpp/utils_cpp/__init__.py",
+        "path": "orchid/utils_cpp/utils_cpp/__init__.py"
+      },
+      {
+        "source": "sigmod/validate_configs.py",
+        "path": "orchid/validate_configs.py"
+      }
+    ]
+  },
+  "faiss": {
+    "repository": "https://github.com/derrickquinn/faiss",
+    "commit": "c58e3b981bc78b46487fb8393f2b6187365f04aa",
+    "packaging": "vendored tracked source"
+  },
+  "packaging_changes": [
+    "Replace obsolete artifact runners with the modern harnesses and adapters.",
+    "Use standalone local CSV output.",
+    "Add portable build environments and synthetic correctness checks.",
+    "Keep evaluation datasets and metadata external."
+  ]
+}

@@ -1,0 +1,10 @@
+kind: test_ivf
+args:
+  nlist: 12288
+  prob_dims: 64
+  pred_zarr: ../data/yfcc10m_single.zarr
+  vec_zarr: ../data/yfcc10m_single.zarr
+  alpha: 0.0
+  grid_size: 32
+  csv: logs/orchid_p_yfcc_single_beta.csv
+  use_gpu: true

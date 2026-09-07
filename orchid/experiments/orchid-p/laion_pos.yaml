@@ -1,0 +1,11 @@
+kind: test_ivf
+args:
+  nlist: 4096
+  prob_dims: 64
+  sample_docs: 512
+  pred_zarr: ../data/laion_pos.zarr
+  vec_zarr: ../data/laion1m.zarr
+  alpha: 0.0
+  grid_size: 32
+  csv: logs/orchid_p_laion_pos_beta.csv
+  use_gpu: true

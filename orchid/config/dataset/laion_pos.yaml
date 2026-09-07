@@ -1,0 +1,4 @@
+name: laion_pos
+vec_zarr: ../data/laion1m.zarr
+pred_zarr: ../data/laion_pos.zarr
+nlists: 4096

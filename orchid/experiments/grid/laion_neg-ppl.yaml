@@ -1,0 +1,10 @@
+kind: test_ivf
+args:
+  nlist: 1024
+  prob_dims: 64
+  sample_docs: 4096
+  pred_zarr: ../data/laion_neg.zarr
+  vec_zarr: ../data/laion1m.zarr
+  csv: logs/laion_negppl4096.csv
+  predict_pl: true
+  grid_size: 32

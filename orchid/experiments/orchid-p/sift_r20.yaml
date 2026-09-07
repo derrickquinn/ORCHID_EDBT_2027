@@ -1,0 +1,10 @@
+kind: test_ivf
+args:
+  nlist: 4096
+  prob_dims: 64
+  pred_zarr: ../data/sift1m_c1000_r20.zarr
+  vec_zarr: ../data/sift1m.zarr
+  alpha: 0.0
+  grid_size: 32
+  csv: logs/orchid_p_sift_r20_beta.csv
+  use_gpu: true

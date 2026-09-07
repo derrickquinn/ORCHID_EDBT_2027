@@ -1,0 +1,8 @@
+kind: test_ivf
+args:
+  nlist: 4096
+  prob_dims: 64
+  pred_zarr: ../data/sift1m_c1000_r10.zarr
+  vec_zarr: ../data/sift1m.zarr
+  csv: logs/sift_r10_4096.csv
+  use_gpu: true

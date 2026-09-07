@@ -1,0 +1,4 @@
+name: sift12
+vec_zarr: ../data/sift1m.zarr
+pred_zarr: ../data/sift1m_c12.zarr
+nlists: 4096

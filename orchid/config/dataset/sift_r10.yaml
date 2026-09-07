@@ -1,0 +1,4 @@
+name: sift_r10
+vec_zarr: ../data/sift1m.zarr
+pred_zarr: ../data/sift1m_c1000_r10.zarr
+nlists: 4096

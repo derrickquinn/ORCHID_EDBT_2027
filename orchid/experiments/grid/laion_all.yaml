@@ -1,0 +1,8 @@
+kind: test_ivf
+args:
+  nlist: 4096
+  prob_dims: 64
+  pred_zarr: ../data/laion_all.zarr
+  vec_zarr: ../data/laion1m.zarr
+  csv: logs/laion_all4096.csv
+  use_gpu: true

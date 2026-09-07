@@ -1,0 +1,8 @@
+kind: test_ivf
+args:
+  nlist: 12288
+  prob_dims: 64
+  pred_zarr: ../data/yfcc10m_single.zarr
+  vec_zarr: ../data/yfcc10m_single.zarr
+  csv: logs/yfcc_single12288.csv
+  use_gpu: true

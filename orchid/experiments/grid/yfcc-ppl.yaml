@@ -1,0 +1,13 @@
+kind: test_ivf
+args:
+  query_start: 4096
+  nlist: 1024
+  prob_dims: 256
+  sample_queries: 4096
+  sample_docs: 1024
+  pred_zarr: ../data/yfcc10m.zarr
+  vec_zarr: ../data/yfcc10m.zarr
+  csv: logs/yfccppl_12288.csv
+  use_gpu: true
+  predict_pl: true
+  grid_size: 32

@@ -1,0 +1,4 @@
+name: laion_neg
+vec_zarr: ../data/laion1m.zarr
+pred_zarr: ../data/laion_neg.zarr
+nlists: 4096
