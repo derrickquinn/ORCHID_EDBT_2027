@@ -29,11 +29,23 @@ The ACORN/NaviX build fetches and verifies upstream revisions pinned in
 It needs network access on the first build. See [build details](docs/build.md)
 for source overrides, CPU tuning, and optional GPU support.
 
-## Local data
+## Dataset preparation
 
-Datasets and metadata are **not distributed with this artifact**. Supply the
-prepared stores and metadata described in [the input specification](docs/data.md).
-For an existing asset directory:
+Prepare SIFT-12 from the public ANN-Benchmarks download (CPU only; no native
+builds required after `pixi install`):
+
+```bash
+pixi run prepare-sift12
+```
+
+This creates `data/sift1m.zarr` and `data/sift1m_c12.zarr` for the existing
+configs, reproducing the local rotated vectors (within small float32 rounding
+differences), seed-42 predicates, and exact stored neighbor IDs. See
+[preparation details](docs/data.md#prepare-sift-12) for disk requirements,
+existing downloads, custom output directories, and the bundled reference data.
+
+Other workloads still require external stores and metadata described in
+[the input specification](docs/data.md). For an existing asset directory:
 
 ```bash
 ln -s /absolute/path/to/assets/data data
@@ -49,12 +61,12 @@ The launcher selects the checked-in paper configuration and runs from `orchid/`,
 so input/config/cache paths have the same meaning for all methods.
 
 ```bash
-pixi run benchmark orchid sift12
-pixi run benchmark orchid-p sift12
-pixi run benchmark ivf sift12
-pixi run benchmark pre-filter sift12
-pixi run benchmark acorn sift12 -- --build-index
-pixi run benchmark navix sift12 -- --build-index
+pixi run benchmark orchid sift12 -- --num_queries 8976
+pixi run benchmark orchid-p sift12 -- --num_queries 8976
+pixi run benchmark ivf sift12 -- --num_queries 8976
+pixi run benchmark pre-filter sift12 -- --num_queries 8976
+pixi run benchmark acorn sift12 -- --build-index --num-queries 8976
+pixi run benchmark navix sift12 -- --build-index --num-queries 8976
 ```
 
 For ACORN/NaviX, `--build-index` builds and saves an index before measurement.
@@ -67,8 +79,8 @@ Use `pixi run benchmark orchid sift12 --dry-run` to inspect a command without
 loading data. Pass additional harness arguments after `--`; for example:
 
 ```bash
-pixi run benchmark orchid sift12 -- --validate_predicates --exp_name checked-orchid
-pixi run benchmark navix sift12 -- --validate-predicates --exp-name checked-navix
+pixi run benchmark orchid sift12 -- --num_queries 8976 --validate_predicates --exp_name checked-orchid
+pixi run benchmark navix sift12 -- --num-queries 8976 --validate-predicates --exp-name checked-navix
 ```
 
 The paper workload uses CPU B=100 and 32 threads, or GPU B=1. The launcher defaults to
@@ -79,7 +91,7 @@ CPUs 4–35 and NUMA nodes 0–1 are available:
 
 ```bash
 numactl -C 4-35 -i 0,1 env OMP_NUM_THREADS=32 OMP_PROC_BIND=true OMP_PLACES=cores \
-  pixi run benchmark orchid sift12
+  pixi run benchmark orchid sift12 -- --num_queries 8976
 ```
 
 Choose a placement appropriate for your machine and use it for every comparison.
@@ -94,7 +106,7 @@ CAGRA uses its own CUDA/cuVS environment and native adapter:
 pixi install --manifest-path orchid/cagra_env/pixi.toml
 pixi run --manifest-path orchid/cagra_env/pixi.toml build-cagra
 pixi run --manifest-path orchid/cagra_env/pixi.toml smoke-cagra
-pixi run --manifest-path orchid/cagra_env/pixi.toml benchmark cagra sift12 -- --build-index
+pixi run --manifest-path orchid/cagra_env/pixi.toml benchmark cagra sift12 -- --build-index --num-queries 8976
 ```
 
 Use the same CPU/NUMA placement as the other methods. The adapter uses cuVS
