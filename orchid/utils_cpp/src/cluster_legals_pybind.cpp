@@ -8,6 +8,7 @@
 #include "cluster_legals_kernels.h"
 #include "predicate_eval_kernels.h"
 #include "topk_kernels.h"
+#include "cluster_legals_gpu_pybind.h"
 
 namespace py = pybind11;
 
@@ -525,7 +526,22 @@ static py::tuple evaluate_predicate_conjunctions_py(
 }
 
 PYBIND11_MODULE(_cluster_legals, m) {
+  // py::class_<GpuSpan<uint8_t>>(m, "GpuSpanByte")
+  //   .def_readonly("data", &GpuSpan<uint8_t>::m_data)
+  //   .def_readonly("size", &GpuSpan<uint8_t>::m_size);
+
+  // py::class_<GpuSpan<float>>(m, "GpuSpanFloat")
+  //   .def_readonly("data", &GpuSpan<float>::m_data)
+  //   .def_readonly("size", &GpuSpan<float>::m_size);
+
+  //   py::class_<GpuSpan<float>>(m, "GpuSpanFloat")
+  //   .def_readonly("data", &GpuSpan<float>::m_data)
+  //   .def_readonly("size", &GpuSpan<float>::m_size);
+
   m.doc() = "Cluster legals kernel (preordered packed)";
+
+  auto gpu = m.def_submodule("gpu");
+  addGpuModule(gpu);
 
   m.def("prepare_cluster_order", &prepare_cluster_order_py,
         py::arg("doc_cluster"), py::arg("n_list"));

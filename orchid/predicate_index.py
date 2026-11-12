@@ -8,6 +8,7 @@ pipeline stage.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ from typing import Literal
 
 import numpy as np
 from utils_cpp import (
+    gpu,
     evaluate_predicate_conjunctions,
     predicate_results_to_bitmap,
     predicate_results_to_mask,
@@ -386,6 +388,47 @@ class SortedRangeIndex:
         return cls(metadata["n_docs"], values, document_ids)
 
 
+def materialize_results_gpu(
+    results: list[PredicateResult],
+    n_docs: int,
+) -> tuple[gpu.byte_gpu_span,  asyncio.Future,  asyncio.Future ]:
+    """ Returns a span that is being created by the Gpu of the materialized bitmask"""
+    posting_lists = []
+    posting_list_sizes = []
+    bit_masks = []
+    list_indices = []
+    bit_mask_indices = []
+    for i, result in enumerate(results):
+        if isinstance(result, PostingList):
+            list_indices.append(i)
+            posting_lists.append(result.ids)
+            posting_list_sizes.append(result.ids.size)
+        elif isinstance(result, PackedBitmap):
+            bit_mask_indices.append(i)
+            bit_masks.append(result.bits)
+        else:
+            raise TypeError("GPU bitmap materialization requires PostingList or PackedBitmap results")
+    
+    upload_promise = gpu.upload(
+        posting_list_span := gpu.prep(posting_lists if posting_lists else _EMPTY_IDS),
+        list_sizing_span := gpu.prep(np.asarray(posting_list_sizes, dtype=np.int32)),
+        list_indices_span := gpu.prep(np.asarray(list_indices, dtype=np.int32)),
+        bit_mask_span := gpu.prep(bit_masks if bit_masks else np.empty(0, dtype=np.uint8)),
+    )
+    bitmask_span = gpu.predicate_results_to_bitmap(
+        posting_list_span,
+        list_sizing_span,
+        list_indices_span,
+        bit_mask_span,
+        np.asarray(bit_mask_indices, dtype=np.int64),
+        len(results),
+        n_docs,
+    )
+
+    start_stamp = upload_promise.get_start_time_stamp()
+    end_stamp = bitmask_span.promise.get_end_time_stamp()
+    return (bitmask_span, start_stamp, end_stamp)
+
 def materialize_results(
     results: list[PredicateResult],
     n_docs: int,
@@ -432,5 +475,6 @@ __all__ = [
     "PredicateResult",
     "SortedRangeIndex",
     "materialize_results",
+    "materialize_results_gpu",
     "materialize_byte_masks",
 ]

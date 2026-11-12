@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Generator, Sequence
 import csv
 from dataclasses import dataclass
 from math import sqrt
@@ -91,6 +91,73 @@ class SweepResult:
     transfer_ratio: float = 0.0
 
 
+def format_sweep_summary(
+    result: SweepResult,
+    *,
+    method: str,
+    dataset: str,
+    gpu: bool,
+    gpu_build: bool,
+    num_queries: int,
+    batch_size: int,
+    measured_passes: int,
+    warmup: int,
+    k: int,
+) -> str:
+    """Render measured results with explicit devices and actual batch sizes."""
+    full_batches, tail = divmod(num_queries, batch_size)
+    batches = full_batches + bool(tail)
+    if full_batches == 0:
+        actual_batch = str(num_queries)
+    elif tail:
+        actual_batch = f"{tail}-{batch_size}"
+    else:
+        actual_batch = str(batch_size)
+    device = "GPU" if gpu else "CPU"
+    sample_word = "batch" if result.timing_samples == 1 else "batches"
+    stages = (
+        ("predicate_eval", "Predicate evaluation", "CPU"),
+        ("mask_materialize", "Mask materialization", "GPU+copy" if gpu else "CPU"),
+        ("cluster_scoring", "Cluster scoring", "CPU"),
+        ("cluster_rank", "Cluster ranking", "CPU"),
+        ("search_prep", "Search preparation", "CPU"),
+        ("vector_search", "Vector search", device),
+        ("other", "Other overhead", "CPU"),
+        ("total", "TOTAL", "CPU+GPU" if gpu else "CPU"),
+    )
+    lines = [
+        "",
+        f"{method.upper()} RESULTS | {dataset.upper()} | {device}",
+        "=" * 68,
+        f"Recall@{k}: {result.recall:.1%}    "
+        f"Throughput: {result.qps:,.2f} queries/s    Clusters searched: {result.parameter}",
+        f"Queries per pass: {num_queries:,}    Batches per pass: {batches:,}",
+        f"Actual queries per batch: {actual_batch}    Batch limit: {batch_size}",
+        f"Measured passes: {measured_passes}    Warmup passes: {warmup} (excluded)",
+        f"Centroid training / assignment: {'GPU' if gpu_build else 'CPU'}",
+        "",
+        f"LATENCY PER BATCH (milliseconds) | {result.timing_samples:,} measured {sample_word}",
+        f"{'Stage':<26} {'Device':<9} {'Median (ms)':>13} {'P95 (ms)':>13}",
+        "-" * 64,
+    ]
+    for stage, label, stage_device in stages:
+        median = result.timing_summary.get(f"{stage}_median_ms")
+        p95 = result.timing_summary.get(f"{stage}_p95_ms")
+        if median is None or p95 is None:
+            continue
+        if stage == "total":
+            lines.append("-" * 64)
+        lines.append(f"{label:<26} {stage_device:<9} {median:>13.3f} {p95:>13.3f}")
+    lines.extend([
+        "",
+        "Median = typical batch; P95 = 95th percentile.",
+        "Setup and warmup are excluded from these query timings.",
+    ])
+    if gpu:
+        lines.append("GPU+copy includes upload and copying the mask back to CPU.")
+    return "\n".join(lines)
+
+
 def run_measured_iterations(
     execute: Callable[[bool], None],
     *,
@@ -101,6 +168,51 @@ def run_measured_iterations(
     min_iterations: int | None = None,
     qps_relative_ci_half_width: float | None = None,
 ) -> Measurement:
+    steps = _measurement_steps(
+        warmup=warmup, iterations=iterations, num_queries=num_queries,
+        before_measure=before_measure, min_iterations=min_iterations,
+        qps_relative_ci_half_width=qps_relative_ci_half_width,
+    )
+    while True:
+        try:
+            record = next(steps)
+        except StopIteration as result:
+            return result.value
+        execute(record)
+
+
+async def run_measured_iterations_async(
+    execute: Callable[[bool], Awaitable[None]],
+    *,
+    warmup: int,
+    iterations: int,
+    num_queries: int,
+    before_measure: Callable[[], None] | None = None,
+    min_iterations: int | None = None,
+    qps_relative_ci_half_width: float | None = None,
+) -> Measurement:
+    steps = _measurement_steps(
+        warmup=warmup, iterations=iterations, num_queries=num_queries,
+        before_measure=before_measure, min_iterations=min_iterations,
+        qps_relative_ci_half_width=qps_relative_ci_half_width,
+    )
+    while True:
+        try:
+            record = next(steps)
+        except StopIteration as result:
+            return result.value
+        await execute(record)
+
+
+def _measurement_steps(
+    *,
+    warmup: int,
+    iterations: int,
+    num_queries: int,
+    before_measure: Callable[[], None] | None = None,
+    min_iterations: int | None = None,
+    qps_relative_ci_half_width: float | None = None,
+) -> Generator[bool, None, Measurement]:
     """Run fixed iterations, or adaptively stop at a precise mean QPS estimate.
 
     In adaptive mode, ``iterations`` is the maximum number of measured runs.
@@ -126,7 +238,7 @@ def run_measured_iterations(
         adaptive_min_iterations = iterations + 1
         adaptive_relative_half_width = 0.0
     for _ in range(warmup):
-        execute(False)
+        yield False
     if before_measure is not None:
         before_measure()
 
@@ -139,7 +251,7 @@ def run_measured_iterations(
     relative_half_width: float | None = None
     converged = not adaptive
     for _ in range(iterations):
-        execute(True)
+        yield True
         iteration_stop = perf_counter()
         iteration_elapsed = iteration_stop - iteration_start
         if iteration_elapsed <= 0:
@@ -330,10 +442,12 @@ __all__ = [
     "Measurement",
     "ORCHID_TIMING_STAGES",
     "SweepResult",
+    "format_sweep_summary",
     "recall_at_k",
     "require_iteration_agreement",
     "require_measurement_convergence",
     "run_measured_iterations",
+    "run_measured_iterations_async",
     "summarize_timings",
     "write_timing_results",
     "write_sweep_results",

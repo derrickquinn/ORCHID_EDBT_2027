@@ -37,6 +37,10 @@ See [the adapter contract](../orchid/baseline_adapters/README.md) for manual bui
 
 ## GPU
 
+`utils_cpp` automatically enables its CUDA build when `nvcc` is available on
+`PATH`, through `NVCC`, or under `CUDA_HOME/bin`. Set `UTILS_CPP_NO_GPU=1` to
+force a CPU build. Switching modes rebuilds the native extension.
+
 CAGRA's separate Pixi manifest pins cuVS/CUDA. Its default CUDA architecture is
 detected from the build machine; cross-compilation can specify
 `pixi run --manifest-path orchid/cagra_env/pixi.toml build-cagra --cuda-architectures 89`.

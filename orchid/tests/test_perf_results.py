@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from unittest.mock import patch
 from tempfile import TemporaryDirectory
@@ -16,10 +17,32 @@ from perf_results import (
     require_iteration_agreement,
     require_measurement_convergence,
     run_measured_iterations,
+    run_measured_iterations_async,
     summarize_timings,
     write_timing_results,
     write_sweep_results,
 )
+
+
+class AsyncMeasurementTest(unittest.IsolatedAsyncioTestCase):
+    async def test_waits_for_iterations_and_preserves_measurements(self):
+        for adaptive in (False, True):
+            options = dict(warmup=1, iterations=5, num_queries=10)
+            if adaptive:
+                options.update(min_iterations=3, qps_relative_ci_half_width=0.05)
+            expected_calls = []
+            with patch("perf_results.perf_counter", side_effect=range(10)):
+                expected = run_measured_iterations(expected_calls.append, **options)
+            actual_calls = []
+
+            async def execute(record):
+                await asyncio.sleep(0)
+                actual_calls.append(record)
+
+            with patch("perf_results.perf_counter", side_effect=range(10)):
+                actual = await run_measured_iterations_async(execute, **options)
+            self.assertEqual(actual, expected)
+            self.assertEqual(actual_calls, expected_calls)
 
 
 class PerfResultsTest(unittest.TestCase):

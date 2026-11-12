@@ -12,6 +12,7 @@ from faiss.loader import (
     IDSelectorArray,
     IDSelectorBatch,
     IDSelector2DBitmap,
+    IDBitmaskArray,
     OperatingPoints,
     RangeSearchResult,
     rev_swig_ptr,
@@ -1328,6 +1329,48 @@ def handle_IDSelector2DBitmap(the_class):
             raise TypeError("unexpected keyword arguments: %s" %
                             ", ".join(kwargs.keys()))
         self.original_init(*args)
+
+    the_class.__init__ = replacement_init
+
+
+def handle_IDBitmaskArray(the_class):
+    the_class.original_init = the_class.__init__
+
+    def replacement_init(self, *args, **kwargs):
+        """
+        Wraps a Gpu buffer into a bitmask that can be handled by FAISS.
+        """
+        if not args and not kwargs:
+            self.original_init()
+            return
+        if len(args) not in (3, 4):
+            raise TypeError(
+                "IDBitmaskArray(buffer, nq, bytes_per_bitmap, N=None)")
+        buffer, nq, bytes_per_bitmap = args[:3]
+        universe = args[3] if len(args) == 4 else kwargs.pop('N', None)
+        if kwargs:
+            raise TypeError("unexpected keyword arguments: %s" %
+                            ", ".join(kwargs.keys()))
+        if bytes_per_bitmap <= 0:
+            raise ValueError("bytes_per_bitmap must be positive")
+        if universe is None:
+            universe = bytes_per_bitmap * 8
+        if universe > bytes_per_bitmap * 8:
+            raise ValueError("N does not fit in bytes_per_bitmap")
+
+        owner = None
+        if not isinstance(buffer, (int, np.integer)):
+            owner = buffer
+            buffer = buffer.data_ptr
+
+        self.original_init()
+        self.queryCount = int(nq)
+        self.totalBitmaskCount = int(universe)
+        self.bytesPerBitmask = int(bytes_per_bitmap)
+        self.buffer = faiss.cast_integer_to_uint8_ptr(int(buffer))
+        self.deviceOwnership = faiss.GpuOwned
+        if owner is not None:
+            add_to_referenced_objects(self, owner)
 
     the_class.__init__ = replacement_init
 

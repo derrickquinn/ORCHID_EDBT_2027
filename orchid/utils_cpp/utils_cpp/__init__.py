@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import numpy as np
 
 from . import _cluster_legals as _impl
 
 prepare_cluster_order = _impl.prepare_cluster_order
 reorder_mask = _impl.reorder_mask
+gpu = _impl.gpu
+prep = gpu.prep
+upload = gpu.upload
 
 
 def topk_small(
@@ -96,6 +101,48 @@ def predicate_results_to_mask(
         posting_lists, dense_masks, n_docs, out, int(threads)
     )
 
+def cluster_legals_gpu(
+    mask_packed: gpu.byte_gpu_span,
+    cluster_offsets: np.ndarray,
+    cluster_counts: np.ndarray,
+    n_queries: int,
+    n_docs: int,
+) -> tuple[gpu.float_gpu_span,  asyncio.Future]:
+    """Gets the percentage of active predicates in each cluster"""
+    if cluster_offsets is None or cluster_counts is None:
+        raise ValueError("cluster_offsets and cluster_counts are required")
+    n_list = int(cluster_counts.shape[0])
+
+    gpu.upload(
+        cluster_offsets_gpu := gpu.prep(cluster_offsets),
+        cluster_counts_gpu := gpu.prep(cluster_counts))
+
+    percentage_span = gpu.cluster_legals_preordered_packed(
+        mask_packed, n_queries, n_docs, cluster_offsets_gpu, cluster_counts_gpu, n_list)
+    
+    end_stamp = percentage_span.promise.get_end_time_stamp()
+    return (percentage_span, end_stamp)
+
+
+def get_top_rankings(
+    clustered_legals: gpu.float_gpu_span,
+    cluster_dist: gpu.float_gpu_span,
+    n_queries: int,
+    n_list: int,
+    n_probe: int,
+    beta: float,
+    eps: float = 1e-9,
+) -> tuple[asyncio.Future, asyncio.Future]:
+    """Return futures for CPU cluster IDs and the readback completion timestamp.
+
+    The native CUDA ranking kernel is currently a stub.
+    """
+    return gpu.get_top_rankings(
+        clustered_legals, cluster_dist, int(n_queries), int(n_list),
+        int(n_probe), float(beta), float(eps),
+    )
+
+
 
 def cluster_legals(
     mask_packed: np.ndarray,
@@ -162,11 +209,16 @@ def evaluate_predicate_conjunctions(
 
 
 __all__ = [
+    "gpu",
+    "prep",
+    "upload",
     "topk_small",
     "cluster_legals",
+    "cluster_legals_gpu",
     "evaluate_predicate_conjunctions",
     "ids_to_bitmap",
     "log_scale",
+    "get_top_rankings",
     "predicate_results_to_bitmap",
     "predicate_results_to_mask",
     "prepare_cluster_order",

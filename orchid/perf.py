@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # ruff: noqa: E402
 import argparse
+import asyncio
 from functools import cache
 import os
 from pathlib import Path
@@ -25,15 +26,16 @@ from ivf_utils import (
     load_or_build_train_c,
     load_svd_mask,
 )
-from predicate_index import materialize_results
+from predicate_index import materialize_results, materialize_results_gpu
 from predicate_workload import load_or_build_predicate_workload
 from perf_results import (
     CLUSTER_TIMING_STAGES,
     SweepResult,
+    format_sweep_summary,
     recall_at_k,
     require_iteration_agreement,
     require_measurement_convergence,
-    run_measured_iterations,
+    run_measured_iterations_async,
     summarize_timings,
     write_timing_results,
     write_sweep_results,
@@ -42,7 +44,10 @@ from src.build_ivf_config import BuildIvfConfig, load_build_ivf_config
 from src.dataset_config import DatasetConfig, load_dataset_config
 from progress import Progress
 from utils_cpp import (
+    gpu,
     cluster_legals,
+    cluster_legals_gpu,
+    get_top_rankings,
     prepare_cluster_order,
     topk_small,
 )
@@ -100,6 +105,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--num_queries", "-nq", type=int, default=10000)
     parser.add_argument("--beta", "-b", type=float, default=0.00)
     parser.add_argument("--iterations", "-i", type=int, default=10)
+    parser.add_argument(
+        "--fixed-iterations",
+        action="store_true",
+        help="Run exactly --iterations measured passes, overriding adaptive settings",
+    )
     parser.add_argument("--min-iterations", type=int, default=None)
     parser.add_argument("--qps-relative-ci-half-width", type=float, default=None)
     parser.add_argument("--warmup", type=int, default=3)
@@ -159,6 +169,7 @@ def _cli_override_dests(parser: argparse.ArgumentParser, argv: list[str]) -> set
         if action is not None and action.dest not in {
             "config",
             "dset_cfg",
+            "fixed_iterations",
         }:
             overrides.add(action.dest)
     return overrides
@@ -183,6 +194,7 @@ def parse_args() -> tuple[BuildIvfConfig, DatasetConfig]:
     argv = sys.argv[1:]
     args = parser.parse_args(argv)
     args_dict = vars(args)
+    fixed_iterations = args_dict.pop("fixed_iterations")
     config_path = args_dict.pop("config", None)
     dset_cfg = args_dict.pop("dset_cfg", None)
     dataset_fields = ("vec_zarr", "pred_zarr", "nlists")
@@ -208,6 +220,10 @@ def parse_args() -> tuple[BuildIvfConfig, DatasetConfig]:
             continue
         base[dest] = args_dict[dest]
 
+    if fixed_iterations:
+        base["min_iterations"] = None
+        base["qps_relative_ci_half_width"] = None
+
     missing = [
         field
         for field in dataset_fields
@@ -228,10 +244,11 @@ def parse_args() -> tuple[BuildIvfConfig, DatasetConfig]:
     )
 
 
-def main():
+async def main():
     args, dataset = parse_args()
     timing_stages = CLUSTER_TIMING_STAGES
     debug = bool(os.getenv("PERF_DEBUG"))
+    pretty_output = os.getenv("ORCHID_PRETTY_OUTPUT") == "1"
 
     use_gpu = args.gpu
     use_gpu_build = args.gpu_build
@@ -267,6 +284,10 @@ def main():
         raise ValueError("warmup must be non-negative")
 
     beta = args.beta
+    method = (
+        "pre-filter" if flat else "orchid" if args.alpha != 0.0
+        else "orchid-p" if beta != 0.0 else "ivf"
+    )
     vec_zarr = dataset.vec_zarr
     pred_zarr = dataset.pred_zarr
     cache_dir = Path(args.cache_base) / dataset.name / args.exp_name
@@ -281,7 +302,16 @@ def main():
         "cache_dir": str(cache_dir),
         "log_dir": str(log_dir),
     }
-    print(yaml.safe_dump(resolved_config, sort_keys=False))
+    if pretty_output:
+        print(f"\nPreparing {method.upper()} / {dataset.name.upper()}", flush=True)
+        print(
+            f"Search device: {'GPU' if use_gpu else 'CPU'} | "
+            f"Clustering setup: {'GPU' if use_gpu_build else 'CPU'} | "
+            f"Queries per pass: {args.num_queries:,}",
+            flush=True,
+        )
+    else:
+        print(yaml.safe_dump(resolved_config, sort_keys=False))
 
     k = args.k
     rk = args.k
@@ -319,7 +349,7 @@ def main():
     with task("Normalize vectors", verbose=True):
         docs /= np.linalg.norm(docs, axis=1, keepdims=True)
 
-    with task("Prepare clustering inputs", verbose=True):
+    with task("Clustering setup (total)", verbose=True):
         svd_mask = None
         if args.sig_dims > 0 and args.alpha != 0.0:
             svd_mask = load_svd_mask(
@@ -413,12 +443,12 @@ def main():
         with task("Upload to GPU", verbose=True):
             _gpu_resources, index = _clone_index_to_gpu(index, args.gpu_device)
 
-    with task("Compute rankings", verbose=True):
+    with task("Prepare query tensors", verbose=True):
         queries = np.ascontiguousarray(queries)
         centroids = np.ascontiguousarray(centroids)
         queries_t = torch.from_numpy(queries)
         centroids_t = torch.from_numpy(centroids[:, :d])
-    with task("Prepare predicate evaluation", verbose=True):
+    with task("Allocate predicate bitmap buffer", verbose=True):
         bytes_per_query = (n + 7) // 8
         predicate_bitmap = np.empty((B, bytes_per_query), dtype=np.uint8)
 
@@ -459,11 +489,20 @@ def main():
         for stat in ("median", "p95")
     ]
 
-    print("n_probe,recall,qps")
-    print(
-        "timings_batch_header,n_probe,samples,qps,"
-        + ",".join(timing_metric_fields)
-    )
+    if pretty_output:
+        print("\nMeasuring query batches (setup excluded)...", flush=True)
+    else:
+        print(
+            f"Execution device: {'GPU' if use_gpu else 'CPU'} | "
+            f"queries per batch: {B} | "
+            f"batches per trace: {(num_queries + B - 1) // B}",
+            flush=True,
+        )
+        print("n_probe,recall,qps")
+        print(
+            "timings_batch_header,n_probe,samples,qps,"
+            + ",".join(timing_metric_fields)
+        )
 
     for n_probe in nprobes:
         if not args.val_flat:
@@ -487,7 +526,7 @@ def main():
             )
             return torch.from_numpy(rankings)
 
-        def execute_trace(*, record: bool) -> None:
+        async def execute_trace(*, record: bool) -> None:
             for i, rows in enumerate(batches):
                 qi = queries[rows]
                 size = len(qi)
@@ -500,38 +539,74 @@ def main():
                 predicate_eval_time = perf_counter() - stage_start
 
                 stage_start = perf_counter()
-                mi = materialize_results(
-                    predicate_results, n, predicate_bitmap[:size], threads=0
-                )
-                mask_materialize_time = perf_counter() - stage_start
+                # Create GPU Alternative here (Id -> Bitmap )
+                if use_gpu:
+                    mi, start_stamp, materialize_results_stamp = materialize_results_gpu(predicate_results, n)
+                else:
+                    stage_start = perf_counter()
+                    mi = materialize_results(
+                        predicate_results, n, predicate_bitmap[:size], threads=0
+                    )
+                    mask_materialize_time = perf_counter() - stage_start
 
                 if not args.val_flat:
                     stage_start = perf_counter()
                     qi_t = queries_t[rows]
                     cluster_dis = qi_t @ centroids_t.T
+
+                    # Create GPU Alternative here (Bitmap -> Cluster percentage legal)
                     if args.alpha != 0.0 or beta != 0.0:
-                        cluster_legals(
-                            mi,
-                            offsets,
-                            counts,
-                            out=out_legals_batch[:size],
-                            threads=0,
-                        )
-                    if args.alpha != 0.0 or beta != 0.0:
-                        pred_term = predicate_log_scores(
-                            out_legals_batch[:size],
-                            beta,
-                            out=out_pred_batch[:size],
-                            threads=0,
-                        )
-                        pred_term = torch.from_numpy(pred_term)
-                        cluster_scores = cluster_dis + pred_term
+                        if use_gpu:
+                            out_legals_batch_span, _ = cluster_legals_gpu(
+                                mi,
+                                offsets,
+                                counts,
+                                size,
+                                n,
+                            )
+                            out_legals_batch[:size] = np.asarray(
+                                await out_legals_batch_span.collect_to_cpu()
+                            ).reshape(size, n_lists)
+                        else:
+                            cluster_legals(
+                                mi,
+                                offsets,
+                                counts,
+                                out=out_legals_batch[:size],
+                                threads=0,
+                            )
+                    # Ideally pull cpu from gpu here
+                    if use_gpu:
+                        if args.alpha != 0.0 or beta != 0.0:
+                            gpu.upload(cluster_dist_span := gpu.prep(
+                                np.ascontiguousarray(cluster_dis.cpu().numpy(), dtype=np.float32)
+                            ))
+                            rankings_future, end_predicate_stamp = get_top_rankings(
+                                out_legals_batch_span, cluster_dist_span,
+                                size, n_lists, n_probe, beta,
+                            )
+                            rankings_adj = torch.from_numpy(np.asarray(
+                                await rankings_future
+                            ).reshape(size, n_probe))
+                        else:
+                            rankings_adj = select_topk(cluster_dis)
                     else:
-                        cluster_scores = cluster_dis
-                    cluster_scoring_time = perf_counter() - stage_start
+                        if args.alpha != 0.0 or beta != 0.0:
+                            pred_term = predicate_log_scores(
+                                out_legals_batch[:size],
+                                beta,
+                                out=out_pred_batch[:size],
+                                threads=0,
+                            )
+                            pred_term = torch.from_numpy(pred_term)
+                            cluster_scores = cluster_dis + pred_term
+                        else:
+                            cluster_scores = cluster_dis
+                        cluster_scoring_time = perf_counter() - stage_start
+
+                        rankings_adj = select_topk(cluster_scores)
 
                     stage_start = perf_counter()
-                    rankings_adj = select_topk(cluster_scores)
                     cluster_rank_time = perf_counter() - stage_start
 
                     stage_start = perf_counter()
@@ -543,16 +618,28 @@ def main():
                 else:
                     cluster_scoring_time = cluster_rank_time = 0.0
                     stage_start = perf_counter()
-                sel = faiss.IDSelector2DBitmap(mi)
-                params.sel2d = sel
+
+                if use_gpu:
+                    bitmask = faiss.IDBitmaskArray(mi, size, bytes_per_query, n)
+                    params.selBitMask = bitmask
+                    mi.promise.make_stream_wait(faiss.cast_cudastream_t_to_integer(
+                        _gpu_resources.getDefaultStream(args.gpu_device)))
+                    bytes_per_bitmap, debug_nq = bytes_per_query, size
+                else:
+                    sel = faiss.IDSelector2DBitmap(mi)
+                    params.sel2d = sel
+                    bitmask = sel.getBitmask()
+                    params.selBitMask = bitmask
+                    bytes_per_bitmap = mi.shape[1] if mi.ndim == 2 else None
+                    debug_nq = mi.shape[0]
+
                 search_prep_time = perf_counter() - stage_start
 
                 stage_start = perf_counter()
                 if debug:
-                    bytes_per_bitmap = mi.shape[1] if mi.ndim == 2 else None
                     print(
                         "debug: search_preassigned start "
-                        f"batch={i} B={mi.shape[0]} bytes_per_bitmap={bytes_per_bitmap} "
+                        f"batch={i} B={debug_nq} bytes_per_bitmap={bytes_per_bitmap} "
                         f"nprobe={n_probe} ntotal={getattr(index, 'ntotal', 'n/a')}",
                         flush=True,
                     )
@@ -574,6 +661,12 @@ def main():
                 returned[rows][valid] = internal_to_external[indices[valid]]
 
                 batch_total_time = perf_counter() - batch_start
+
+                if use_gpu:
+                    mask_materialize_time = (await materialize_results_stamp) - (await start_stamp) 
+                    # Convert to seconds
+                    mask_materialize_time = mask_materialize_time / 1000
+
                 if record:
                     accounted_components = [
                         predicate_eval_time,
@@ -590,7 +683,7 @@ def main():
                         accounted_components + [other_time, batch_total_time]
                     )
 
-        measurement = run_measured_iterations(
+        measurement = await run_measured_iterations_async(
             lambda record: execute_trace(record=record),
             warmup=warmup,
             iterations=iters,
@@ -603,14 +696,23 @@ def main():
             assert measurement.qps_ci_lower is not None
             assert measurement.qps_ci_upper is not None
             assert measurement.qps_relative_ci_half_width is not None
-            print(
-                f"qps_confidence,{n_probe},"
-                f"{len(measurement.iteration_qps)},{measurement.qps:.2f},"
-                f"{measurement.qps_ci_lower:.2f},"
-                f"{measurement.qps_ci_upper:.2f},"
-                f"{measurement.qps_relative_ci_half_width:.4%}",
-                flush=True,
-            )
+            if pretty_output:
+                print(
+                    f"Probes {n_probe}: QPS confidence interval "
+                    f"{measurement.qps_ci_lower:,.2f} to "
+                    f"{measurement.qps_ci_upper:,.2f} queries/s "
+                    f"({len(measurement.iteration_qps)} measured passes)",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"qps_confidence,{n_probe},"
+                    f"{len(measurement.iteration_qps)},{measurement.qps:.2f},"
+                    f"{measurement.qps_ci_lower:.2f},"
+                    f"{measurement.qps_ci_upper:.2f},"
+                    f"{measurement.qps_relative_ci_half_width:.4%}",
+                    flush=True,
+                )
             require_measurement_convergence(
                 measurement,
                 context=measurement_context,
@@ -639,10 +741,11 @@ def main():
             f"{float(timing_record[field]):.6f}"
             for field in timing_metric_fields
         ]
-        print(
-            f"timings_batch,{n_probe},{timing_record['samples']},"
-            f"{measured_qps:.2f}," + ",".join(timing_values)
-        )
+        if not pretty_output:
+            print(
+                f"timings_batch,{n_probe},{timing_record['samples']},"
+                f"{measured_qps:.2f}," + ",".join(timing_values)
+            )
 
         returned = returned.reshape(-1, rk)
         result = SweepResult(
@@ -655,21 +758,33 @@ def main():
         sweep_results.append(result)
         result_str = f"{n_probe},{result.recall:.3f},{result.qps:.2f}"
 
-        print(result_str)
+        if pretty_output:
+            print(
+                format_sweep_summary(
+                    result, method=method, dataset=dataset.name,
+                    gpu=use_gpu, gpu_build=use_gpu_build,
+                    num_queries=num_queries, batch_size=B,
+                    measured_passes=len(measurement.iteration_qps),
+                    warmup=warmup, k=k,
+                ),
+                flush=True,
+            )
+        else:
+            print(result_str)
 
-    method = (
-        "pre-filter" if flat else "orchid" if args.alpha != 0.0
-        else "orchid-p" if beta != 0.0 else "ivf"
-    )
     experiment = args.exp_name or method
-    write_timing_results(
+    timing_output = write_timing_results(
         sweep_results, log_dir, experiment, parameter_name="n_probe"
     )
     output = write_sweep_results(
         sweep_results, log_dir, experiment, parameter_name="n_probe"
     )
-    print(f"Wrote sweep: {output}")
+    if pretty_output:
+        print(f"\nSaved recall / throughput: {output}", flush=True)
+        print(f"Saved stage timings:      {timing_output}", flush=True)
+    else:
+        print(f"Wrote sweep: {output}")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

@@ -90,6 +90,7 @@ struct SearchParametersIVF : SearchParameters {
     const IDSelector* sel = nullptr;
     /// 2D ID selector for per-query filtering
     const IDSelector2D* sel2d = nullptr;  // ADD THIS LINE
+    const faiss::IDBitmaskArray* selBitMask = nullptr;
 
     virtual ~SearchParametersIVF() {}
 };

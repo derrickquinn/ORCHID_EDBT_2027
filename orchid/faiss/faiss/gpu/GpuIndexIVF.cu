@@ -360,65 +360,69 @@ void GpuIndexIVF::searchImpl_(
 
     if (params) {
         auto ivfParams = dynamic_cast<const SearchParametersIVF*>(params);
-        if (ivfParams && ivfParams->sel2d) {
+        if (ivfParams && ivfParams->selBitMask) {
             FAISS_THROW_IF_NOT_MSG(
                     ivfParams->sel == nullptr,
                     "GpuIndexIVF: combining 1-D and 2-D selectors is not supported on GPU");
 
-            auto bitmapSelector =
-                    dynamic_cast<const IDSelector2DBitmap*>(ivfParams->sel2d);
+            const IDBitmaskArray* bitmask = ivfParams->selBitMask;
             FAISS_THROW_IF_NOT_MSG(
-                    bitmapSelector,
-                    "GpuIndexIVF currently supports only IDSelector2DBitmap selectors");
-            FAISS_THROW_IF_NOT_MSG(
-                    bitmapSelector->bytes_per_bitmap > 0,
+                    bitmask->bytesPerBitmask > 0,
                     "IDSelector2DBitmap must provide bytes_per_bitmap > 0");
             FAISS_THROW_IF_NOT_FMT(
-                    bitmapSelector->nq >= n,
+                    bitmask->queryCount >= n,
                     "IDSelector2DBitmap has nq=%zu but %ld queries were provided",
-                    bitmapSelector->nq,
+                    bitmask->queryCount,
                     n);
             FAISS_THROW_IF_NOT_FMT(
-                    bitmapSelector->N >= this->ntotal,
+                    bitmask->totalBitmaskCount >= this->ntotal,
                     "IDSelector2DBitmap universe (%zu) is smaller than index size (%ld)",
-                    bitmapSelector->N,
+                    bitmask->totalBitmaskCount,
                     this->ntotal);
+            FAISS_THROW_IF_NOT_MSG(
+                    bitmask->deviceOwnership & BitmaskOwnership::CpuAndGpuOwned,
+                    "bitmask is not owned by CPU or GPU and thus cannot be used");
 
-            auto stream = resources_->getDefaultStream(config_.device);
-            size_t bitmapBytes = size_t(n) * bitmapSelector->bytes_per_bitmap;
+            if (bitmask->deviceOwnership & BitmaskOwnership::GpuOwned) {
+                selectorBitmapStride = bitmask->bytesPerBitmask;
+                selectorBitmapPtr = bitmask->buffer;
+            } 
+            else if (bitmask->deviceOwnership & BitmaskOwnership::CpuOwned) {
+                const size_t bitmapBytes = size_t(n) * bitmask->bytesPerBitmask;
+                auto stream = resources_->getDefaultStream(config_.device);
+                if (bitmapBytes > selectorPinnedBufferSize_) {
+                    if (selectorPinnedBuffer_) {
+                        CUDA_VERIFY(cudaFreeHost(selectorPinnedBuffer_));
+                        selectorPinnedBuffer_ = nullptr;
+                        selectorPinnedBufferSize_ = 0;
+                    }
 
-            if (bitmapBytes > selectorPinnedBufferSize_) {
-                if (selectorPinnedBuffer_) {
-                    CUDA_VERIFY(cudaFreeHost(selectorPinnedBuffer_));
-                    selectorPinnedBuffer_ = nullptr;
-                    selectorPinnedBufferSize_ = 0;
+                    if (bitmapBytes > 0) {
+                        CUDA_VERIFY(cudaHostAlloc(
+                                reinterpret_cast<void**>(&selectorPinnedBuffer_),
+                                bitmapBytes,
+                                cudaHostAllocDefault));
+                        selectorPinnedBufferSize_ = bitmapBytes;
+                    }
                 }
 
                 if (bitmapBytes > 0) {
-                    CUDA_VERIFY(cudaHostAlloc(
-                            reinterpret_cast<void**>(&selectorPinnedBuffer_),
-                            bitmapBytes,
-                            cudaHostAllocDefault));
-                    selectorPinnedBufferSize_ = bitmapBytes;
+                    std::memcpy(selectorPinnedBuffer_, bitmask->buffer, bitmapBytes);
+
+                    auto tmpBitmap = toDeviceTemporary<uint8_t, 1>(
+                            resources_.get(),
+                            config_.device,
+                            selectorPinnedBuffer_,
+                            stream,
+                            {static_cast<idx_t>(bitmapBytes)});
+                    selectorBitmapStride = bitmask->bytesPerBitmask;
+                    selectorBitmapTensor = std::move(tmpBitmap);
+                    selectorBitmapPtr =
+                            reinterpret_cast<const uint8_t*>(selectorBitmapTensor.data());
+                } else {
+                    selectorBitmapStride = bitmask->bytesPerBitmask;
+                    selectorBitmapPtr = nullptr;
                 }
-            }
-
-            if (bitmapBytes > 0) {
-                std::memcpy(selectorPinnedBuffer_, bitmapSelector->base, bitmapBytes);
-
-                auto tmpBitmap = toDeviceTemporary<uint8_t, 1>(
-                        resources_.get(),
-                        config_.device,
-                        selectorPinnedBuffer_,
-                        stream,
-                        {static_cast<idx_t>(bitmapBytes)});
-                selectorBitmapStride = bitmapSelector->bytes_per_bitmap;
-                selectorBitmapTensor = std::move(tmpBitmap);
-                selectorBitmapPtr =
-                        reinterpret_cast<const uint8_t*>(selectorBitmapTensor.data());
-            } else {
-                selectorBitmapStride = bitmapSelector->bytes_per_bitmap;
-                selectorBitmapPtr = nullptr;
             }
         }
     }
@@ -463,7 +467,30 @@ void GpuIndexIVF::search_preassigned(
     const uint8_t* selectorBitmapPtr = nullptr;
     size_t selectorBitmapStride = 0;
 
-    if (params && params->sel2d) {
+    if (params && params->selBitMask &&
+        (params->selBitMask->deviceOwnership & BitmaskOwnership::GpuOwned)) {
+        // Caller-provided device bitmap: used in place, no host round trip.
+        // The caller must order its producing stream before this index's default stream.
+        const IDBitmaskArray* bitmask = params->selBitMask;
+        FAISS_THROW_IF_NOT_MSG(
+                params->sel == nullptr,
+                "GpuIndexIVF: combining 1-D and 2-D selectors is not supported on GPU");
+        FAISS_THROW_IF_NOT_MSG(
+                bitmask->bytesPerBitmask > 0,
+                "IDBitmaskArray must provide bytesPerBitmask > 0");
+        FAISS_THROW_IF_NOT_FMT(
+                bitmask->queryCount >= n,
+                "IDBitmaskArray has queryCount=%zu but %ld queries were provided",
+                bitmask->queryCount,
+                n);
+        FAISS_THROW_IF_NOT_FMT(
+                bitmask->totalBitmaskCount >= this->ntotal,
+                "IDBitmaskArray universe (%zu) is smaller than index size (%ld)",
+                bitmask->totalBitmaskCount,
+                this->ntotal);
+        selectorBitmapStride = bitmask->bytesPerBitmask;
+        selectorBitmapPtr = bitmask->buffer;
+    } else if (params && params->sel2d) {
         FAISS_THROW_IF_NOT_MSG(
                 params->sel == nullptr,
                 "GpuIndexIVF: combining 1-D and 2-D selectors is not supported on GPU");

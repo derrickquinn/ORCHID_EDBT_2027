@@ -23,6 +23,25 @@
 
 namespace faiss {
 
+enum BitmaskOwnership : uint8_t {
+    CpuOwned = 0b1,
+    GpuOwned = 0b10,
+    CpuAndGpuOwned = 0b11
+};
+
+struct IDBitmaskArray {
+    size_t queryCount;
+    size_t totalBitmaskCount;
+    size_t bytesPerBitmask;
+    const uint8_t* buffer;
+    BitmaskOwnership deviceOwnership;
+};
+
+/** Bitmask-based ID selector. */
+struct IDBitmaskSelector {
+        virtual IDBitmaskArray getBitmask() const = 0;
+};
+
 /** Base class: query-aware membership test. */
 struct IDSelector2D {
     virtual bool is_member(idx_t q, idx_t id) const = 0;
@@ -41,7 +60,7 @@ struct IDSelector2D {
  * The selector does not own the memory; the caller must keep it alive
  * for the duration of the search.
  */
-struct IDSelector2DBitmap : IDSelector2D {
+struct IDSelector2DBitmap : IDSelector2D, IDBitmaskSelector {
     const uint8_t* base = nullptr;    ///< pointer to concatenated bitmaps
     size_t bytes_per_bitmap = 0;      ///< ceil(N / 8)
     idx_t N = 0;                      ///< universe size (id in [0, N))
@@ -49,6 +68,15 @@ struct IDSelector2DBitmap : IDSelector2D {
 
     inline const uint8_t* bm(idx_t q) const {
         return base + q * bytes_per_bitmap;
+    }
+
+    IDBitmaskArray getBitmask() const override {
+        return {
+            .queryCount = static_cast<size_t>(nq), 
+            .totalBitmaskCount = static_cast<size_t>(N), 
+            .bytesPerBitmask = bytes_per_bitmap, 
+            .buffer = base, 
+            .deviceOwnership = BitmaskOwnership::CpuOwned};
     }
 
     bool is_member(idx_t q, idx_t id) const final {

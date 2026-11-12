@@ -46,6 +46,7 @@ class_wrappers.handle_IDSelectorSubset(IDSelectorBatch, class_owns=True)
 class_wrappers.handle_IDSelectorSubset(IDSelectorArray, class_owns=False)
 class_wrappers.handle_IDSelectorSubset(IDSelectorBitmap, class_owns=False, force_int64=False)
 class_wrappers.handle_IDSelector2DBitmap(IDSelector2DBitmap)
+class_wrappers.handle_IDBitmaskArray(IDBitmaskArray)
 class_wrappers.handle_CodeSet(CodeSet)
 
 class_wrappers.handle_Tensor2D(Tensor2D)

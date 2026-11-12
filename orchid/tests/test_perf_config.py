@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import perf
-from perf import _cli_override_dests, _clone_index_to_gpu, build_arg_parser
+from perf import _clone_index_to_gpu
 from src.baseline_perf_config import KNOWN_DATASETS
 from src.build_ivf_config import BuildIvfConfig, load_build_ivf_config
 from validate_configs import _validate_file
@@ -23,6 +23,27 @@ class PerfConfigTest(unittest.TestCase):
         self.assertEqual(dataset.name, "sift12")
         self.assertEqual(batch_size_for(config.gpu, config.batch_size), 100)
         self.assertAlmostEqual(config.alpha, sqrt(0.205353))
+
+    def test_fixed_iterations_overrides_adaptive_paper_settings(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        argv = [
+            "perf.py", "--config", str(root / "config/perf/orchid.yaml"),
+            "--dset_cfg", str(root / "config/dataset/sift12.yaml"),
+            "--fixed-iterations", "--iterations", "3", "--warmup", "1",
+        ]
+        with patch("sys.argv", argv):
+            config, dataset = perf.parse_args()
+        self.assertEqual(dataset.name, "sift12")
+        self.assertEqual(config.iterations, 3)
+        self.assertEqual(config.warmup, 1)
+        self.assertIsNone(config.min_iterations)
+        self.assertIsNone(config.qps_relative_ci_half_width)
+        self.assertAlmostEqual(config.alpha, sqrt(0.205353))
+        with patch("sys.argv", argv[:5]):
+            adaptive, _ = perf.parse_args()
+        self.assertEqual(adaptive.iterations, 100)
+        self.assertEqual(adaptive.min_iterations, 3)
+        self.assertEqual(adaptive.qps_relative_ci_half_width, 0.05)
 
     def test_defaults_use_paper_batch_and_warmup(self) -> None:
         config = BuildIvfConfig()
